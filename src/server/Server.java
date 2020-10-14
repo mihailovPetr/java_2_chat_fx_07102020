@@ -1,25 +1,32 @@
 package server;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Server {
+
     private List<ClientHandler> clients;
     private AuthService authService;
+    private ServerSocket server;
+    public final int PORT;
 
     public Server() {
+        this(8189);
+    }
+
+    public Server(int port) {
         clients = new CopyOnWriteArrayList<>();
         authService = new SimpleAuthService();
-        ServerSocket server = null;
+        PORT = port;
+    }
+
+
+    public void start() {
+
         Socket socket = null;
-        final int PORT = 8189;
 
         try {
             server = new ServerSocket(PORT);
@@ -27,7 +34,7 @@ public class Server {
 
             while (true) {
                 socket = server.accept();
-                new ClientHandler(this, socket);
+                new ClientHandler(this, socket, authService);
             }
 
         } catch (IOException e) {
@@ -44,13 +51,8 @@ public class Server {
                 e.printStackTrace();
             }
         }
-    }
 
-    public void broadcastMsg(ClientHandler sender, String msg) {
-        String message = String.format("[ %s ]: %s", sender.getNickname(), msg);
-        for (ClientHandler c : clients) {
-            c.sendMsg(message);
-        }
+
     }
 
     public void subscribe(ClientHandler clientHandler) {
@@ -61,7 +63,28 @@ public class Server {
         clients.remove(clientHandler);
     }
 
-    public AuthService getAuthService() {
-        return authService;
+    public void sendMsgTo(ClientHandler sender, String destination, String msg) {
+        if (destination == null || msg == null) {
+            return;
+        }
+
+        String message = String.format("[ %s ]: %s", sender.getNickname(), msg);
+
+        if (destination.equals("/all")) {
+            for (ClientHandler c : clients) {
+                c.sendMsg(message);
+            }
+        } else {
+            for (ClientHandler c : clients) {
+                if (c.getNickname().equals(destination)) {
+                    c.sendMsg(message);
+                    sender.sendMsg(message);
+                    break;
+                }
+
+            }
+        }
     }
+
+
 }

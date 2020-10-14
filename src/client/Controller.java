@@ -92,7 +92,6 @@ public class Controller implements Initializable {
                     //цикл работы
                     while (true) {
                         String str = in.readUTF();
-
                         if (str.equals("/end")) {
                             break;
                         }
@@ -123,7 +122,16 @@ public class Controller implements Initializable {
             return;
         }
         try {
-            out.writeUTF(textField.getText());
+            String msg = textField.getText().trim();
+            String[] token = msg.split("\\s+");
+
+            if (token[0].equals("/w")){
+                msg = String.format("/Message %s %s", token[1], token[2]);
+            } else {
+                msg = "/Message /all " + msg;
+            }
+
+            out.writeUTF(msg);
             textField.clear();
             textField.requestFocus();
         } catch (IOException e) {
@@ -136,7 +144,7 @@ public class Controller implements Initializable {
             connect();
         }
 
-        String msg = String.format("/auth %s %s",
+        String msg = String.format("/Authentification %s %s",
                 loginField.getText().trim(), passwordField.getText().trim());
         try {
             out.writeUTF(msg);
