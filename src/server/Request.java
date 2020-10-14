@@ -1,7 +1,6 @@
 package server;
 
-import static server.MessageCode.Authentification;
-import static server.MessageCode.Message;
+import static server.MessageCode.*;
 
 public class Request {
 
