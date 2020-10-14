@@ -4,74 +4,87 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import static server.MessageCode.*;
 
 public class ClientHandler {
-    DataInputStream in;
-    DataOutputStream out;
-    Server server;
-    Socket socket;
 
-    private String nickname;
-    private String login;
+    private Server server;
+    private Socket socket;
+    private AuthService authService;
+    private DataInputStream in;
+    private DataOutputStream out;
+    private User user = null;
 
-    public ClientHandler(Server server, Socket socket) {
+    public ClientHandler(Server server, Socket socket, AuthService authService) {
         try {
+
             this.server = server;
             this.socket = socket;
+            this.authService = authService;
             in = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
             System.out.println("Client connected " + socket.getRemoteSocketAddress());
 
             new Thread(() -> {
+
                 try {
-                    //цикл аутентификации
                     while (true) {
                         String str = in.readUTF();
+                        Request request = new Request(str);
 
-                        if (str.startsWith("/auth ")) {
-                            String[] token = str.split("\\s");
-                            if (token.length < 3) {
-                                continue;
-                            }
-                            String newNick = server.getAuthService()
-                                    .getNicknameByLoginAndPassword(token[1], token[2]);
-                            if (newNick != null){
-                                nickname = newNick;
-                                server.subscribe(this);
-                                sendMsg("/authok "+ newNick);
+                        switch (request.getCode()) {
+                            case Authentification:
+                                authentificate(request);
                                 break;
-                            } else {
-                                sendMsg("Неверный логин / пароль");
-                            }
+                            case Message:
+                                sendMsgTo(request.getDestination(), request.getMessage());
+                                break;
+                            case Disconnect:
+                                disconnect();
+                                break;
+                            case Undefined:
+                                break;
                         }
+
                     }
-                    //цикл работы
 
-
-                    while (true) {
-                        String str = in.readUTF();
-
-                        if (str.equals("/end")) {
-                            sendMsg("/end");
-                            break;
-                        }
-                        server.broadcastMsg(this, str);
-                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
-                    server.unsubscribe(this);
-                    System.out.println("Client disconnected " + socket.getRemoteSocketAddress());
-                    try {
-                        socket.close();
-                        in.close();
-                        out.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    disconnect();
                 }
+
             }).start();
 
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
+    private void authentificate(Request request) {
+        if (user != null || request.getCode() != Authentification) {
+            return;
+        }
+
+        user = authService.getUser(request.getLogin(), request.getPassword());
+        if (user != null) {
+            server.subscribe(this);
+            sendMsg("/authok " + user.getNickname());
+        } else {
+            sendMsg("Неверный логин / пароль");
+        }
+
+    }
+
+    private void disconnect() {
+        server.unsubscribe(this);
+        System.out.println("Client disconnected " + socket.getRemoteSocketAddress());
+        try {
+            socket.close();
+            in.close();
+            out.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -86,6 +99,12 @@ public class ClientHandler {
     }
 
     public String getNickname() {
-        return nickname;
+        return user.getNickname();
+    }
+
+    private void sendMsgTo(String destination, String message) {
+        if (user != null) {
+            server.sendMsgTo(this, destination, message);
+        }
     }
 }

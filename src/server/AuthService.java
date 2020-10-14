@@ -1,5 +1,6 @@
 package server;
 
 public interface AuthService {
-    String getNicknameByLoginAndPassword(String login, String password);
+
+    public User getUser(String login, String password);
 }
